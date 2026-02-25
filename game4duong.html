@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đấu Trường Hình Học - Lớp 7 (Bản Mở Rộng)</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body { margin: 0; padding: 0; background-color: #0f172a; font-family: system-ui, -apple-system, sans-serif; }
+    
+    /* Animations */
+    .bounce-in { animation: bounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards; }
+    @keyframes bounceIn {
+      0% { transform: scale(0.3); opacity: 0; }
+      50% { transform: scale(1.05); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    
+    .slide-up { animation: slideUp 0.4s ease-out forwards; }
+    @keyframes slideUp {
+      from { transform: translateY(30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+    @keyframes shake {
+      10%, 90% { transform: translate3d(-1px, 0, 0); }
+      20%, 80% { transform: translate3d(2px, 0, 0); }
+      30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+      40%, 60% { transform: translate3d(4px, 0, 0); }
+    }
+
+    .option-card { transition: all 0.2s ease; cursor: pointer; }
+    .option-card:hover:not(.disabled) { transform: translateY(-4px) scale(1.02); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2); }
+    .option-card:active:not(.disabled) { transform: translateY(0) scale(0.98); }
+    .option-card.disabled { cursor: not-allowed; opacity: 0.9; }
+    
+    .bg-pattern {
+      background-image: radial-gradient(#334155 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    
+    /* Hide scrollbar for nav */
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body>
+  <div id="root" class="w-full min-h-screen flex flex-col"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // --- ICONS ---
+    const Trophy = ({ size = 24, className = "" }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>);
+    const Swords = ({ size = 24, className = "" }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"></polyline><line x1="13" x2="19" y1="19" y2="13"></line><line x1="16" x2="20" y1="16" y2="20"></line><line x1="19" x2="21" y1="21" y2="19"></line><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"></polyline><line x1="5" x2="9" y1="14" y2="18"></line><line x1="7" x2="4" y1="17" y2="20"></line><line x1="3" x2="5" y1="19" y2="21"></line></svg>);
+    const CheckCircle = ({ size = 24, className = "" }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>);
+    const XCircle = ({ size = 24, className = "" }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"></circle><line x1="15" x2="9" y1="9" y2="15"></line><line x1="9" x2="15" y1="9" y2="15"></line></svg>);
+    const Zap = ({ size = 24, className = "" }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>);
+
+    // --- BỘ 15 CÂU HỎI ---
+    const QUESTIONS = [
+      {
+        topic: "Khởi động - Tên gọi",
+        question: "Giao điểm của 3 đường TRUNG TUYẾN trong một tam giác có tên gọi là gì?",
+        options: ["Trực tâm", "Trọng tâm", "Tâm đường tròn nội tiếp", "Tâm đường tròn ngoại tiếp"],
+        correct: 1,
+        explanation: "Chính xác! Giao điểm 3 đường trung tuyến gọi là TRỌNG TÂM. Nó là điểm cân bằng của tam giác."
+      },
+      {
+        topic: "Khởi động - Tên gọi",
+        question: "TRỰC TÂM của tam giác là giao điểm của 3 đường nào?",
+        options: ["Đường cao", "Đường trung tuyến", "Đường trung trực", "Đường phân giác"],
+        correct: 0,
+        explanation: "Đúng! TRỰC TÂM là giao điểm của 3 ĐƯỜNG CAO (kẻ vuông góc từ đỉnh xuống cạnh đối diện)."
+      },
+      {
+        topic: "Phân giác - Nhận diện",
+        question: "Giao điểm của 3 đường PHÂN GIÁC trong tam giác có tính chất gì đặc biệt?",
+        options: ["Cách đều 3 đỉnh", "Cách đều 3 cạnh", "Nằm trên một cạnh", "Chia tam giác thành 3 phần bằng nhau"],
+        correct: 1,
+        explanation: "Tuyệt vời! Giao điểm 3 đường phân giác CÁCH ĐỀU 3 CẠNH. Nó chính là tâm của đường tròn nằm lọt thỏm bên trong tam giác (đường tròn nội tiếp)."
+      },
+      {
+        topic: "Trung trực - Nhận diện",
+        question: "Điểm CÁCH ĐỀU 3 ĐỈNH của một tam giác là giao điểm của 3 đường nào?",
+        options: ["Đường cao", "Đường trung tuyến", "Đường trung trực", "Đường phân giác"],
+        correct: 2,
+        explanation: "Rất tốt! Vì điểm đó cách đều 3 đỉnh nên nó là tâm đường tròn đi qua 3 đỉnh (ngoại tiếp). Tâm này là giao của 3 ĐƯỜNG TRUNG TRỰC."
+      },
+      {
+        topic: "Tính toán - Góc",
+        question: "Cho tam giác ABC, góc A = 60°. Kẻ tia phân giác AD (D thuộc BC). Số đo góc BAD là bao nhiêu?",
+        options: ["20°", "30°", "40°", "60°"],
+        correct: 1,
+        explanation: "Đúng rồi! Tia phân giác chia đôi góc. Nên góc BAD = 60° : 2 = 30°."
+      },
+      {
+        topic: "Tính toán - Tìm x",
+        question: "Cho tam giác ABC có trọng tâm G. AM là đường trung tuyến. Biết độ dài đoạn AG = 4cm. Tính độ dài đoạn thẳng AM?",
+        options: ["6 cm", "8 cm", "2 cm", "12 cm"],
+        correct: 0,
+        explanation: "Xuất sắc! Tính chất trọng tâm: AG = 2/3 AM. Từ đó suy ra AM = AG : (2/3) = 4 x 3/2 = 6cm."
+      },
+      {
+        topic: "Tính chất - Phân giác",
+        question: "Cho điểm M nằm trên tia phân giác của góc xOy. Khẳng định nào sau đây là ĐÚNG?",
+        options: [
+          "Điểm M cách đều điểm O và tia Ox",
+          "Khoảng cách từ M đến tia Ox lớn hơn khoảng cách từ M đến tia Oy",
+          "Điểm M cách đều hai tia Ox và Oy",
+          "Tia MO vuông góc với tia Ox"
+        ],
+        correct: 2,
+        explanation: "Chính xác! Tính chất đặc trưng của tia phân giác: Bất cứ điểm nào nằm trên tia phân giác cũng CÁCH ĐỀU hai cạnh tạo nên góc đó."
+      },
+      {
+        topic: "Tính toán Nâng cao",
+        question: "Tam giác ABC có góc A = 80°. Hai đường phân giác của góc B và góc C cắt nhau tại I. Tính số đo góc BIC?",
+        options: ["100°", "120°", "130°", "140°"],
+        correct: 2,
+        explanation: "Giỏi lắm! Công thức nhanh: Góc BIC = 90° + (Góc A)/2 = 90° + 40° = 130°. Hoặc tính chi tiết: B+C = 180°-80°=100° => B/2 + C/2 = 50° => BIC = 180°-50° = 130°."
+      },
+      {
+        topic: "Nhận diện Hình",
+        question: "Trong một TAM GIÁC VUÔNG, Trực tâm (giao 3 đường cao) nằm ở vị trí nào?",
+        options: ["Nằm bên trong tam giác", "Nằm trên cạnh huyền", "Nằm ở trung điểm cạnh huyền", "Trùng với đỉnh góc vuông"],
+        correct: 3,
+        explanation: "Đúng! Trong tam giác vuông, hai cạnh góc vuông chính là hai đường cao. Chúng cắt nhau ngay tại đỉnh góc vuông, nên Trực tâm trùng với đỉnh góc vuông."
+      },
+      {
+        topic: "Ứng dụng Thực tế",
+        question: "Ba gia đình A, B, C sống ở 3 vị trí tạo thành một tam giác. Họ muốn đào chung một cái giếng sao cho giếng CÁCH ĐỀU 3 NHÀ. Điểm đào giếng là giao của 3 đường nào?",
+        options: ["Đường cao", "Đường trung tuyến", "Đường trung trực", "Đường phân giác"],
+        correct: 2,
+        explanation: "Chính xác! Giếng cách đều 3 nhà (3 đỉnh của tam giác). Điểm cách đều 3 đỉnh chính là giao điểm của 3 đường TRUNG TRỰC."
+      },
+      {
+        topic: "Ứng dụng Thực tế",
+        question: "Một công viên hình tam giác được bao quanh bởi 3 con đường. Cần đặt một trạm phát wifi sao cho trạm CÁCH ĐỀU 3 CON ĐƯỜNG. Trạm này là giao của 3 đường nào?",
+        options: ["Đường cao", "Đường trung tuyến", "Đường trung trực", "Đường phân giác"],
+        correct: 3,
+        explanation: "Quá chuẩn! Khoảng cách từ trạm đến 3 con đường (3 cạnh) bằng nhau. Giao điểm cách đều 3 cạnh là giao của 3 đường PHÂN GIÁC."
+      },
+      {
+        topic: "Bẫy - Tam giác cân",
+        question: "Cho tam giác ABC cân tại A. Gọi AM là đường phân giác. Khẳng định nào sau đây là SAI?",
+        options: [
+          "AM đi qua trung điểm của đoạn thẳng BC",
+          "AM vuông góc với đoạn thẳng BC",
+          "Điểm M cách đều hai đỉnh B và C",
+          "Đường phân giác AM KHÔNG thể là đường cao"
+        ],
+        correct: 3,
+        explanation: "Bạn đã phát hiện ra lỗi sai! Trong tam giác cân, đường phân giác xuất phát từ đỉnh cân ĐỒNG THỜI là đường cao, đường trung tuyến và đường trung trực."
+      },
+      {
+        topic: "Tính toán - Trung trực",
+        question: "Đường thẳng d là đường trung trực của đoạn thẳng AB. Điểm M nằm trên d. Biết MA = 5cm, độ dài MB là bao nhiêu?",
+        options: ["2.5 cm", "5 cm", "10 cm", "Không thể tính được"],
+        correct: 1,
+        explanation: "Chính xác! Điểm nằm trên đường trung trực của một đoạn thẳng thì luôn cách đều hai mút của đoạn thẳng đó. Vậy MA = MB = 5cm."
+      },
+      {
+        topic: "Tổng hợp - Suy luận",
+        question: "Nếu một tam giác có Trọng tâm TRÙNG VỚI Trực tâm thì đó là loại tam giác gì?",
+        options: ["Tam giác vuông", "Tam giác cân", "Tam giác đều", "Tam giác tù"],
+        correct: 2,
+        explanation: "Hoàn hảo! Khi trung tuyến trùng với đường cao ở cả 3 đỉnh, điều đó có nghĩa là cả 3 cạnh của tam giác đều bằng nhau. Đó là TAM GIÁC ĐỀU."
+      },
+      {
+        topic: "Trùm cuối - Bẫy Phân Giác",
+        question: "Hai đường phân giác xuất phát từ đỉnh B và đỉnh C của tam giác ABC cắt nhau tại I. Khẳng định nào sau đây CHẮC CHẮN ĐÚNG?",
+        options: [
+          "AI vuông góc với BC",
+          "I là trung điểm của BC",
+          "AI là tia phân giác của góc A",
+          "AI đi qua trung điểm của BC"
+        ],
+        correct: 2,
+        explanation: "Chúc mừng em! Ba đường phân giác của một tam giác cùng đi qua một điểm. Vì I là giao của 2 phân giác B và C, nên đường nối từ đỉnh còn lại (A) đi qua I CHẮC CHẮN là đường phân giác của góc A."
+      }
+    ];
+
+    // --- MAIN GAME COMPONENT ---
+    const GeometryGame = () => {
+      const [currentQ, setCurrentQ] = useState(0);
+      const [score, setScore] = useState(0);
+      const [combo, setCombo] = useState(0);
+      const [selectedAns, setSelectedAns] = useState(null);
+      const [showResult, setShowResult] = useState(false);
+      const [isFinished, setIsFinished] = useState(false);
+      
+      const q = QUESTIONS[currentQ];
+
+      const handleSelect = (index) => {
+        if (showResult) return; 
+        setSelectedAns(index);
+        setShowResult(true);
+
+        if (index === q.correct) {
+          setScore(s => s + 10 + (combo * 5)); // Base 10, bonus 5 per combo
+          setCombo(c => c + 1);
+        } else {
+          setCombo(0); 
+        }
+      };
+
+      const handleNext = () => {
+        if (currentQ < QUESTIONS.length - 1) {
+          setCurrentQ(currentQ + 1);
+          setSelectedAns(null);
+          setShowResult(false);
+          // Scroll to top mobile smoothly
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          setIsFinished(true);
+        }
+      };
+
+      const restartGame = () => {
+        setCurrentQ(0);
+        setScore(0);
+        setCombo(0);
+        setSelectedAns(null);
+        setShowResult(false);
+        setIsFinished(false);
+      };
+
+      // --- MÀN HÌNH KẾT THÚC ---
+      if (isFinished) {
+        const correctAnswers = score > 0 ? QUESTIONS.filter((_, i) => true).length /* Tính logic ở đây hơi phức tạp do combo, ta dùng số câu đúng ẩn */ : 0;
+        // Logic tính lại số câu đúng (Vì tính score theo combo hơi khó lùi lại, ta giả lập số câu đúng dựa trên số điểm)
+        // Cách tốt nhất là thêm 1 state rightCount, nhưng để gọn ta đánh giá qua mức điểm.
+        const maxScore = 15 * 10 + (14 * 15 / 2) * 5; // Tầm 675 điểm
+        
+        let title = "BẬC THẦY HÌNH HỌC";
+        let message = "Tuyệt vời! Em đã nắm vững toàn bộ kiến thức về 4 đường trong tam giác. Kỹ năng tính toán và nhận diện rất xuất sắc!";
+        let ringColor = "border-amber-400";
+        let trophyBg = "bg-amber-400";
+        let trophyGlow = "shadow-[0_0_50px_rgba(251,191,36,0.6)]";
+
+        if (score < 200) {
+          title = "CHIẾN BINH TẬP SỰ";
+          message = "Em đã làm rất tốt, nhưng hãy xem lại sổ tay công thức một chút để không bị sập bẫy nhé!";
+          ringColor = "border-slate-400";
+          trophyBg = "bg-slate-400";
+          trophyGlow = "shadow-[0_0_50px_rgba(148,163,184,0.6)]";
+        } else if (score < 400) {
+          title = "CHUYÊN GIA GIẢI TOÁN";
+          message = "Rất tốt! Em đã hiểu rõ các tính chất. Chỉ cần cẩn thận hơn ở những câu tính toán phức tạp là hoàn hảo.";
+          ringColor = "border-sky-400";
+          trophyBg = "bg-sky-400";
+          trophyGlow = "shadow-[0_0_50px_rgba(56,189,248,0.6)]";
+        }
+
+        return (
+          <div className="flex-1 flex items-center justify-center p-4 bg-pattern relative overflow-hidden">
+            <div className={`bg-slate-800 p-8 md:p-12 rounded-3xl shadow-2xl border-4 ${ringColor} max-w-2xl w-full text-center bounce-in z-10`}>
+              <div className={`w-32 h-32 mx-auto ${trophyBg} rounded-full flex items-center justify-center mb-6 ${trophyGlow}`}>
+                <Trophy size={64} className="text-white" />
+              </div>
+              <h2 className={`text-4xl font-black mb-2 ${score >= 400 ? 'text-amber-400' : 'text-white'}`}>{title}</h2>
+              <p className="text-xl text-slate-300 mb-8">{message}</p>
+              
+              <div className="flex justify-center gap-6 mb-10">
+                <div className="bg-slate-900/50 p-6 rounded-2xl w-40 border border-slate-700">
+                  <p className="text-slate-400 font-bold mb-2">ĐIỂM SỐ</p>
+                  <p className="text-5xl font-black text-white">{score}</p>
+                </div>
+              </div>
+
+              <button 
+                onClick={restartGame}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xl px-10 py-4 rounded-full transition-transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(79,70,229,0.4)]"
+              >
+                CHƠI LẠI TỪ ĐẦU
+              </button>
+            </div>
+            
+            {/* Background effects */}
+            <div className="absolute top-0 left-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-[100px]"></div>
+            <div className="absolute bottom-0 right-0 w-64 h-64 bg-emerald-500/20 rounded-full blur-[100px]"></div>
+          </div>
+        );
+      }
+
+      // --- MÀN HÌNH CHƠI ---
+      const progressPercent = ((currentQ) / QUESTIONS.length) * 100;
+
+      return (
+        <div className="flex-1 flex flex-col items-center p-3 sm:p-6 bg-pattern pb-20">
+          <div className="w-full max-w-4xl flex flex-col gap-5">
+            
+            {/* HEADER GAME: Stats & Progress */}
+            <div className="bg-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col gap-4 border border-slate-700 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-indigo-600/20 p-2 sm:p-3 rounded-xl border border-indigo-500/30">
+                    <Swords className="text-indigo-400" size={28} />
+                  </div>
+                  <div>
+                    <div className="text-slate-400 font-bold text-xs sm:text-sm uppercase tracking-wider">Câu hỏi</div>
+                    <div className="text-white font-black text-xl sm:text-2xl">{currentQ + 1} <span className="text-slate-500 text-lg">/ {QUESTIONS.length}</span></div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 text-right">
+                  {combo >= 2 && (
+                    <div className="hidden sm:flex text-amber-400 font-black animate-pulse items-center gap-1 bg-amber-400/10 px-3 py-1 rounded-full border border-amber-400/20">
+                      <Zap size={16} /> Lửa Combo x{combo}
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-slate-400 font-bold text-xs sm:text-sm uppercase tracking-wider">Điểm</div>
+                    <div className="text-amber-400 font-black text-2xl sm:text-3xl font-mono">{score}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress Bar Mới - Liền mạch thay vì từng chấm */}
+              <div className="w-full bg-slate-900 rounded-full h-2.5 sm:h-3 overflow-hidden shadow-inner relative">
+                <div 
+                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(16,185,129,0.8)]"
+                  style={{ width: `${progressPercent}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* KHUNG CÂU HỎI */}
+            <div className="bg-slate-800 rounded-3xl p-6 sm:p-10 border-t-4 border-indigo-500 shadow-2xl relative">
+              <div className="absolute -top-3.5 left-6 sm:left-10 bg-indigo-500 text-white font-bold px-4 py-1.5 rounded-full text-xs sm:text-sm uppercase tracking-wider shadow-lg">
+                {q.topic}
+              </div>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-snug mt-2 sm:mt-4 text-center sm:text-left">
+                {q.question}
+              </h2>
+            </div>
+
+            {/* CÁC LỰA CHỌN */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mt-1">
+              {q.options.map((opt, idx) => {
+                let cardClass = "bg-slate-800 border-slate-600 text-slate-200 hover:bg-slate-750 hover:border-indigo-400";
+                let icon = null;
+                
+                if (showResult) {
+                  cardClass = "bg-slate-800/80 border-slate-700 text-slate-500 disabled"; 
+                  
+                  if (idx === q.correct) {
+                    cardClass = "bg-emerald-900/80 border-emerald-500 text-emerald-100 disabled shadow-[0_0_15px_rgba(16,185,129,0.2)]";
+                    icon = <CheckCircle className="text-emerald-400" size={28} />;
+                  } else if (idx === selectedAns) {
+                    cardClass = "bg-red-900/80 border-red-500 text-red-100 shake disabled";
+                    icon = <XCircle className="text-red-400" size={28} />;
+                  }
+                }
+
+                const letter = String.fromCharCode(65 + idx); // A, B, C, D
+
+                return (
+                  <div 
+                    key={idx}
+                    onClick={() => handleSelect(idx)}
+                    className={`option-card p-4 sm:p-5 rounded-2xl border-2 flex items-center gap-4 ${cardClass}`}
+                  >
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-black text-lg sm:text-xl shrink-0 transition-colors
+                      ${showResult && idx === q.correct ? 'bg-emerald-500 text-white' : 
+                        showResult && idx === selectedAns ? 'bg-red-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
+                      {letter}
+                    </div>
+                    <span className="text-base sm:text-lg font-medium flex-1">{opt}</span>
+                    {icon}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* GIẢI THÍCH & NEXT BUTTON */}
+            {showResult && (
+              <div className="mt-2 slide-up w-full flex flex-col gap-4">
+                <div className={`p-5 sm:p-6 rounded-2xl border-l-4 ${selectedAns === q.correct ? 'bg-emerald-900/30 border-emerald-500' : 'bg-red-900/30 border-red-500'}`}>
+                  <h3 className={`font-black text-lg sm:text-xl mb-2 flex items-center gap-2 ${selectedAns === q.correct ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {selectedAns === q.correct ? '🎉 CHÍNH XÁC!' : '💥 ÔI SAI RỒI!'}
+                  </h3>
+                  <p className="text-slate-300 text-base sm:text-lg leading-relaxed">{q.explanation}</p>
+                </div>
+                
+                <button 
+                  onClick={handleNext}
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-black text-lg sm:text-xl py-4 sm:py-5 rounded-2xl transition-all shadow-[0_8px_20px_rgba(79,70,229,0.3)] flex justify-center items-center gap-2"
+                >
+                  {currentQ < QUESTIONS.length - 1 ? "CÂU TIẾP THEO" : "XEM BẢNG ĐIỂM"} 
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                </button>
+              </div>
+            )}
+
+          </div>
+        </div>
+      );
+    };
+
+    // --- MAIN APP WRAPPER ---
+    const App = () => {
+      return (
+        <div className="flex flex-col min-h-screen bg-slate-900">
+          <header className="bg-slate-950 text-white px-4 sm:px-6 py-4 shadow-md z-20 shrink-0 border-b border-slate-800 flex justify-center sm:justify-start items-center">
+            <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight flex items-center gap-2">
+              <span className="text-amber-500">Toán 7</span> <span className="text-slate-600 font-normal">|</span> Đấu Trường Hình Học
+            </h1>
+          </header>
+          
+          <GeometryGame />
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
