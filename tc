@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Khám Phá Tính Chất Phân Giác</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body { margin: 0; padding: 0; background-color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+    .grab-cursor { cursor: grab; }
+    .grab-cursor:active { cursor: grabbing; }
+    .fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .text-outline {
+      text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+    }
+  </style>
+</head>
+<body>
+  <div id="root" class="w-full min-h-screen flex flex-col"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // --- CÁC ICON SVG ---
+    const BookOpen = ({ size = 24, className = "" }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>);
+    const Sparkles = ({ size = 24, className = "" }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path></svg>);
+    const Eye = ({ size = 24, className = "" }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
+    const Target = ({ size = 24, className = "" }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>);
+    const LockOpen = ({ size = 24, className = "" }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>);
+    const Compass = ({ size = 24, className = "" }) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>);
+
+    // --- CÁC HÀM TÍNH TOÁN HÌNH HỌC ---
+    const distance = (p1, p2) => Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
+    
+    // Tìm giao điểm của phân giác góc A với cạnh BC
+    const getBisectorIntersect = (A, B, C, c, b) => {
+      // Phân giác trong chia cạnh đối diện theo tỉ lệ b/c
+      const ratio = c / b;
+      return {
+        x: (B.x + ratio * C.x) / (1 + ratio),
+        y: (B.y + ratio * C.y) / (1 + ratio)
+      };
+    };
+
+    // Tìm hình chiếu vuông góc của điểm P lên đoạn thẳng V1V2
+    const getPerpendicularFoot = (P, V1, V2) => {
+      const l2 = distance(V1, V2) ** 2;
+      if (l2 === 0) return V1;
+      let t = ((P.x - V1.x) * (V2.x - V1.x) + (P.y - V1.y) * (V2.y - V1.y)) / l2;
+      t = Math.max(0, Math.min(1, t)); // Giới hạn trên đoạn thẳng
+      return {
+        x: V1.x + t * (V2.x - V1.x),
+        y: V1.y + t * (V2.y - V1.y)
+      };
+    };
+
+    const InteractiveTriangle = () => {
+      // Trạng thái các đỉnh (mặc định)
+      const [vertices, setVertices] = useState({
+        A: { x: 300, y: 100 },
+        B: { x: 100, y: 350 },
+        C: { x: 500, y: 350 }
+      });
+      
+      const [dragging, setDragging] = useState(null);
+      const svgRef = useRef(null);
+
+      // Trạng thái các nút hiển thị
+      const [showBisectors, setShowBisectors] = useState(true);
+      const [showDistances, setShowDistances] = useState(false);
+      const [showIncircle, setShowIncircle] = useState(false);
+
+      // Trạng thái phần câu hỏi
+      const [answers, setAnswers] = useState({ q1: '', q2: '' });
+      const [isUnlocked, setIsUnlocked] = useState(false);
+
+      // --- TÍNH TOÁN CÁC THÔNG SỐ TRONG THỜI GIAN THỰC ---
+      const { A, B, C } = vertices;
+      const a = distance(B, C);
+      const b = distance(A, C);
+      const c = distance(A, B);
+
+      // Tọa độ tâm đường tròn nội tiếp (Giao 3 đường phân giác) I
+      const I = {
+        x: (a * A.x + b * B.x + c * C.x) / (a + b + c),
+        y: (a * A.y + b * B.y + c * C.y) / (a + b + c)
+      };
+
+      // Giao điểm phân giác với các cạnh đối diện
+      const Ap = getBisectorIntersect(A, B, C, c, b);
+      const Bp = getBisectorIntersect(B, A, C, c, a);
+      const Cp = getBisectorIntersect(C, A, B, b, a);
+
+      // Chân đường vuông góc từ I xuống 3 cạnh
+      const D = getPerpendicularFoot(I, B, C); // trên BC
+      const E = getPerpendicularFoot(I, A, C); // trên AC
+      const F = getPerpendicularFoot(I, A, B); // trên AB
+
+      // Bán kính đường tròn nội tiếp (Khoảng cách từ I xuống 1 cạnh)
+      const r = distance(I, D);
+
+      // Xử lý kéo thả
+      const getMousePos = (evt) => {
+        const CTM = svgRef.current.getScreenCTM();
+        if(evt.touches) {
+          return {
+            x: (evt.touches[0].clientX - CTM.e) / CTM.a,
+            y: (evt.touches[0].clientY - CTM.f) / CTM.d
+          };
+        }
+        return {
+          x: (evt.clientX - CTM.e) / CTM.a,
+          y: (evt.clientY - CTM.f) / CTM.d
+        };
+      };
+
+      const startDrag = (evt, point) => {
+        evt.preventDefault();
+        setDragging(point);
+      };
+
+      const drag = (evt) => {
+        if (dragging) {
+          evt.preventDefault();
+          const coord = getMousePos(evt);
+          // Giới hạn vùng kéo thả trong khung viewBox 600x450
+          coord.x = Math.max(20, Math.min(580, coord.x));
+          coord.y = Math.max(20, Math.min(430, coord.y));
+          setVertices(prev => ({ ...prev, [dragging]: coord }));
+        }
+      };
+
+      const endDrag = () => { setDragging(null); };
+
+      // Kích hoạt sự kiện toàn cục khi đang kéo
+      useEffect(() => {
+        if (dragging) {
+          window.addEventListener('mousemove', drag);
+          window.addEventListener('mouseup', endDrag);
+          window.addEventListener('touchmove', drag, {passive: false});
+          window.addEventListener('touchend', endDrag);
+        } else {
+          window.removeEventListener('mousemove', drag);
+          window.removeEventListener('mouseup', endDrag);
+          window.removeEventListener('touchmove', drag);
+          window.removeEventListener('touchend', endDrag);
+        }
+        return () => {
+          window.removeEventListener('mousemove', drag);
+          window.removeEventListener('mouseup', endDrag);
+          window.removeEventListener('touchmove', drag);
+          window.removeEventListener('touchend', endDrag);
+        };
+      }, [dragging, vertices]);
+
+      // Kiểm tra đáp án
+      useEffect(() => {
+        if (answers.q1 === '1' && answers.q2 === 'đều') {
+          setIsUnlocked(true);
+        } else {
+          setIsUnlocked(false);
+        }
+      }, [answers]);
+
+      // Helper vẽ ký hiệu góc vuông
+      const drawRightAngle = (P, lineP1, lineP2, size = 10) => {
+        // Vectơ chỉ phương của cạnh
+        const dx = lineP2.x - lineP1.x;
+        const dy = lineP2.y - lineP1.y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        const ux = dx/len;
+        const uy = dy/len;
+        
+        // Vectơ pháp tuyến hướng về I (tâm I)
+        const nx = I.x - P.x;
+        const ny = I.y - P.y;
+        const nlen = Math.sqrt(nx*nx + ny*ny);
+        const vnx = nx/nlen;
+        const vny = ny/nlen;
+
+        // Điểm góc vuông
+        const p1 = { x: P.x + ux * size, y: P.y + uy * size };
+        const p2 = { x: P.x + vnx * size, y: P.y + vny * size };
+        const p3 = { x: P.x + ux * size + vnx * size, y: P.y + uy * size + vny * size };
+
+        return <polyline points={`${p1.x},${p1.y} ${p3.x},${p3.y} ${p2.x},${p2.y}`} fill="none" stroke="#ef4444" strokeWidth="1.5" />;
+      };
+
+      return (
+        <div className="flex-1 bg-gradient-to-b from-slate-50 to-indigo-50 p-4 md:p-8 overflow-y-auto">
+          <div className="max-w-6xl mx-auto">
+            
+            {/* TIÊU ĐỀ KHU VỰC */}
+            <div className="mb-6 text-center">
+              <h2 className="text-3xl md:text-4xl font-black text-indigo-800 flex items-center justify-center gap-3">
+                <Compass className="text-indigo-500" size={36} /> Hoạt Động Khám Phá
+              </h2>
+              <p className="text-slate-600 mt-2 text-lg">Em hãy tự tay thay đổi hình dáng tam giác và bật các nút tính năng để rút ra quy luật nhé!</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              
+              {/* CỘT TRÁI: BẢNG VẼ TƯƠNG TÁC */}
+              <div className="bg-white p-4 rounded-3xl shadow-xl border border-slate-200 flex flex-col">
+                
+                {/* Bảng điều khiển Toggles */}
+                <div className="flex flex-wrap gap-3 mb-4 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                  <label className="flex items-center gap-2 cursor-pointer select-none bg-purple-100 text-purple-800 px-4 py-2 rounded-xl font-bold hover:bg-purple-200 transition">
+                    <input type="checkbox" className="w-5 h-5 accent-purple-600" checked={showBisectors} onChange={(e) => setShowBisectors(e.target.checked)} />
+                    Hiện 3 đường phân giác
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer select-none bg-red-100 text-red-800 px-4 py-2 rounded-xl font-bold hover:bg-red-200 transition">
+                    <input type="checkbox" className="w-5 h-5 accent-red-600" checked={showDistances} onChange={(e) => setShowDistances(e.target.checked)} />
+                    Hiện khoảng cách đến 3 cạnh
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer select-none bg-emerald-100 text-emerald-800 px-4 py-2 rounded-xl font-bold hover:bg-emerald-200 transition">
+                    <input type="checkbox" className="w-5 h-5 accent-emerald-600" checked={showIncircle} onChange={(e) => setShowIncircle(e.target.checked)} />
+                    Hiện đường tròn nội tiếp
+                  </label>
+                </div>
+
+                {/* Khu vực hiển thị số liệu trực tiếp */}
+                <div className="flex justify-center gap-6 mb-2 text-lg font-black font-mono">
+                  {showDistances ? (
+                    <>
+                      <span className="text-red-600">ID = {(r/10).toFixed(1)}</span>
+                      <span className="text-red-600">IE = {(r/10).toFixed(1)}</span>
+                      <span className="text-red-600">IF = {(r/10).toFixed(1)}</span>
+                    </>
+                  ) : (
+                    <span className="text-slate-400 font-normal italic">Bật nút "Hiện khoảng cách" để xem số đo</span>
+                  )}
+                </div>
+
+                {/* SVG CANVAS */}
+                <div className="w-full relative bg-slate-50 rounded-2xl border-2 border-dashed border-slate-300 overflow-hidden touch-none" style={{ aspectRatio: '4/3' }}>
+                  <svg ref={svgRef} viewBox="0 0 600 450" className="w-full h-full">
+                    {/* Hình tam giác gốc */}
+                    <polygon points={`${A.x},${A.y} ${B.x},${B.y} ${C.x},${C.y}`} fill="#f1f5f9" stroke="#334155" strokeWidth="3" strokeLinejoin="round" />
+
+                    {/* Đường tròn nội tiếp */}
+                    {showIncircle && (
+                      <circle cx={I.x} cy={I.y} r={r} fill="#10b981" fillOpacity="0.15" stroke="#10b981" strokeWidth="2" strokeDasharray="4 4" className="fade-in-up" />
+                    )}
+
+                    {/* 3 Đường phân giác */}
+                    {showBisectors && (
+                      <g className="fade-in-up">
+                        <line x1={A.x} y1={A.y} x2={Ap.x} y2={Ap.y} stroke="#a855f7" strokeWidth="2.5" />
+                        <line x1={B.x} y1={B.y} x2={Bp.x} y2={Bp.y} stroke="#a855f7" strokeWidth="2.5" />
+                        <line x1={C.x} y1={C.y} x2={Cp.x} y2={Cp.y} stroke="#a855f7" strokeWidth="2.5" />
+                        <circle cx={I.x} cy={I.y} r={5} fill="#a855f7" />
+                        <text x={I.x + 8} y={I.y - 8} fontSize="18" fontWeight="bold" fill="#7e22ce" className="text-outline">I</text>
+                      </g>
+                    )}
+
+                    {/* Khoảng cách & Chân đường vuông góc */}
+                    {showDistances && (
+                      <g className="fade-in-up">
+                        <line x1={I.x} y1={I.y} x2={D.x} y2={D.y} stroke="#ef4444" strokeWidth="2" strokeDasharray="5 5" />
+                        <line x1={I.x} y1={I.y} x2={E.x} y2={E.y} stroke="#ef4444" strokeWidth="2" strokeDasharray="5 5" />
+                        <line x1={I.x} y1={I.y} x2={F.x} y2={F.y} stroke="#ef4444" strokeWidth="2" strokeDasharray="5 5" />
+                        
+                        {/* Ký hiệu vuông góc */}
+                        {drawRightAngle(D, B, C)}
+                        {drawRightAngle(E, A, C)}
+                        {drawRightAngle(F, A, B)}
+
+                        <circle cx={D.x} cy={D.y} r={4} fill="#ef4444" />
+                        <text x={D.x} y={D.y + 20} fontSize="16" fontWeight="bold" fill="#ef4444" textAnchor="middle" className="text-outline">D</text>
+                        
+                        <circle cx={E.x} cy={E.y} r={4} fill="#ef4444" />
+                        <text x={E.x + 15} y={E.y} fontSize="16" fontWeight="bold" fill="#ef4444" textAnchor="middle" className="text-outline">E</text>
+                        
+                        <circle cx={F.x} cy={F.y} r={4} fill="#ef4444" />
+                        <text x={F.x - 15} y={F.y} fontSize="16" fontWeight="bold" fill="#ef4444" textAnchor="middle" className="text-outline">F</text>
+                      </g>
+                    )}
+
+                    {/* Các đỉnh A, B, C (Vẽ sau cùng để nổi lên trên) */}
+                    <g onMouseDown={(e) => startDrag(e, 'A')} onTouchStart={(e) => startDrag(e, 'A')} className="grab-cursor">
+                      <circle cx={A.x} cy={A.y} r={20} fill="transparent" />
+                      <circle cx={A.x} cy={A.y} r={8} fill="#3b82f6" stroke="#fff" strokeWidth="2" />
+                      <text x={A.x} y={A.y - 15} fontSize="20" fontWeight="bold" fill="#1e3a8a" textAnchor="middle" className="text-outline">A</text>
+                    </g>
+                    <g onMouseDown={(e) => startDrag(e, 'B')} onTouchStart={(e) => startDrag(e, 'B')} className="grab-cursor">
+                      <circle cx={B.x} cy={B.y} r={20} fill="transparent" />
+                      <circle cx={B.x} cy={B.y} r={8} fill="#3b82f6" stroke="#fff" strokeWidth="2" />
+                      <text x={B.x - 15} y={B.y + 20} fontSize="20" fontWeight="bold" fill="#1e3a8a" textAnchor="middle" className="text-outline">B</text>
+                    </g>
+                    <g onMouseDown={(e) => startDrag(e, 'C')} onTouchStart={(e) => startDrag(e, 'C')} className="grab-cursor">
+                      <circle cx={C.x} cy={C.y} r={20} fill="transparent" />
+                      <circle cx={C.x} cy={C.y} r={8} fill="#3b82f6" stroke="#fff" strokeWidth="2" />
+                      <text x={C.x + 15} y={C.y + 20} fontSize="20" fontWeight="bold" fill="#1e3a8a" textAnchor="middle" className="text-outline">C</text>
+                    </g>
+                  </svg>
+                  
+                  <div className="absolute bottom-2 left-0 w-full text-center pointer-events-none">
+                    <span className="bg-white/80 px-4 py-1 rounded-full text-sm font-bold text-slate-500 shadow-sm backdrop-blur-sm">
+                      Kéo thả các đỉnh màu xanh để thay đổi tam giác
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* CỘT PHẢI: CÂU HỎI & BÍ KÍP */}
+              <div className="flex flex-col gap-6">
+                
+                {/* Phần Nhận xét (Điền khuyết) */}
+                <div className="bg-white p-6 rounded-3xl shadow-lg border-2 border-indigo-100">
+                  <h3 className="text-2xl font-black text-indigo-900 mb-4 flex items-center gap-2">
+                    <Eye className="text-indigo-500" /> Điền Khuyết Để Rút Ra Nhận Xét
+                  </h3>
+                  <p className="text-slate-600 mb-6">Em hãy quan sát hình bên cạnh, thử bật/tắt các nút, kéo các đỉnh và chọn từ thích hợp vào chỗ trống nhé:</p>
+                  
+                  <div className="space-y-6 text-lg font-medium text-slate-800 bg-indigo-50/50 p-5 rounded-2xl">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      <span>1. Ba đường phân giác của một tam giác cùng đi qua</span>
+                      <select 
+                        className={`p-2 rounded-xl border-2 font-bold focus:outline-none focus:ring-4 ${answers.q1 === '1' ? 'bg-emerald-100 border-emerald-500 text-emerald-800' : 'bg-white border-indigo-200 text-indigo-900 focus:ring-indigo-100'}`}
+                        value={answers.q1}
+                        onChange={(e) => setAnswers({...answers, q1: e.target.value})}
+                      >
+                        <option value="">-- Chọn --</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                      </select>
+                      <span>điểm (Gọi là điểm I).</span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 leading-relaxed">
+                      <span>2. Điểm I này cách</span>
+                      <select 
+                        className={`p-2 rounded-xl border-2 font-bold focus:outline-none focus:ring-4 ${answers.q2 === 'đều' ? 'bg-emerald-100 border-emerald-500 text-emerald-800' : 'bg-white border-indigo-200 text-indigo-900 focus:ring-indigo-100'}`}
+                        value={answers.q2}
+                        onChange={(e) => setAnswers({...answers, q2: e.target.value})}
+                      >
+                        <option value="">-- Chọn --</option>
+                        <option value="không đều">không đều</option>
+                        <option value="đều">đều</option>
+                      </select>
+                      <span>ba cạnh của tam giác đó.</span>
+                    </div>
+                    
+                    <div className="text-sm text-slate-500 italic mt-2">
+                      (Gợi ý: Bật nút "Hiện khoảng cách" và nhìn số đo ID, IE, IF ở bên trái)
+                    </div>
+                  </div>
+                </div>
+
+                {/* Phần Bí kíp vở ghi (Ẩn/Hiện dựa vào câu trả lời) */}
+                <div className={`relative transition-all duration-700 ${isUnlocked ? 'opacity-100 translate-y-0' : 'opacity-50 blur-sm pointer-events-none translate-y-4'}`}>
+                  
+                  {!isUnlocked && (
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-100/40 backdrop-blur-sm rounded-3xl border-2 border-slate-200">
+                      <LockOpen size={40} className="text-slate-400 mb-2" />
+                      <p className="font-bold text-slate-500">Hoàn thành nhận xét ở trên để mở khóa Bí Kíp!</p>
+                    </div>
+                  )}
+
+                  <div className="bg-gradient-to-br from-amber-50 to-yellow-100 p-6 sm:p-8 rounded-3xl shadow-xl border-2 border-amber-300 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-300 rounded-full blur-3xl opacity-40 -translate-y-1/2 translate-x-1/2"></div>
+                    
+                    <h3 className="text-2xl font-black text-amber-800 mb-4 flex items-center gap-2">
+                      <BookOpen className="text-amber-600" /> BÍ KÍP 2: Chép vào vở ngay!
+                    </h3>
+                    
+                    <div className="bg-white p-5 rounded-2xl border border-amber-200 shadow-sm relative z-10 space-y-3">
+                      <p className="font-bold text-lg text-slate-800">Định lý tính chất ba đường phân giác:</p>
+                      <p className="text-xl leading-relaxed text-indigo-900 bg-indigo-50 p-4 rounded-xl border-l-4 border-indigo-500 font-medium">
+                        Ba đường phân giác của một tam giác cùng đi qua một điểm. Điểm này cách đều ba cạnh của tam giác đó.
+                      </p>
+                      <div className="text-slate-700 mt-4 font-mono text-base font-bold flex flex-col gap-2">
+                        <span className="flex items-center gap-2">
+                          <Target size={18} className="text-purple-600"/> 
+                          Giao điểm: Điểm I
+                        </span>
+                        <span className="flex items-center gap-2 text-red-600">
+                          <Target size={18} className="text-red-500"/> 
+                          Kết luận: ID = IE = IF
+                        </span>
+                      </div>
+                      
+                      {isUnlocked && (
+                         <div className="mt-4 flex justify-center fade-in-up delay-300">
+                           <span className="inline-flex items-center gap-2 bg-emerald-500 text-white px-4 py-2 rounded-full font-bold shadow-md animate-pulse">
+                             <Sparkles size={18} /> Chính xác! Em đã tự tìm ra định lý rồi đấy!
+                           </span>
+                         </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // --- MAIN APP WRAPPER ---
+    const App = () => {
+      return (
+        <div className="flex flex-col min-h-screen bg-slate-50">
+          <header className="bg-gradient-to-r from-purple-800 to-indigo-700 text-white px-6 py-4 shadow-md z-20 shrink-0">
+            <h1 className="text-2xl font-black uppercase tracking-tight flex items-center gap-2">
+              Toán 7 <span className="text-purple-300 font-normal">|</span> Tính chất ba đường phân giác của tam giác
+            </h1>
+          </header>
+          
+          <nav className="flex bg-white border-b border-slate-200 px-4 shrink-0 shadow-sm z-10 overflow-x-auto">
+            <button className="flex items-center gap-2 px-6 py-4 font-bold text-slate-500 hover:text-slate-700 transition-colors whitespace-nowrap">
+              Phần 1: Khái niệm & Phân biệt
+            </button>
+            <button className="flex items-center gap-2 px-6 py-4 font-bold border-b-4 border-indigo-600 text-indigo-700 bg-indigo-50/50 transition-colors whitespace-nowrap">
+              Phần 2: Khám phá Tính Chất
+            </button>
+          </nav>
+
+          <InteractiveTriangle />
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
